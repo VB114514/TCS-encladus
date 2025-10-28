@@ -1,7 +1,5 @@
-/**
- * forecast-models.js
- * 负责生成各种数值模型的预报数据。
- */
+//forecast-models.js
+//负责生成各种数值模型的预报数据。
 import { getSST, normalizeLongitude } from './utils.js';
 import { calculateSteering, updatePressureSystems } from './cyclone-model.js';
 
@@ -44,4 +42,5 @@ export function generatePathForecasts(cyclone, pressureSystems) {
         forecasts.push({ name: model.name, track: track });
     });
     return forecasts;
+
 }
