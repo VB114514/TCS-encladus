@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>热带气旋模拟器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" xintegrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-900 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- [修改] 添加 relative 样式，为设置菜单提供定位锚点 -->
+    <div class="relative w-full max-w-6xl mx-auto bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-2xl p-6 md:p-8">
+        
+        <!-- [新增] 设置按钮 -->
+        <div class="absolute top-4 right-4 z-50">
+            <button id="settingsButton" class="text-gray-400 hover:text-white transition-colors text-2xl px-2 py-1 rounded-lg">
+                <i class="fa-solid fa-gear"></i>
+            </button>
+        </div>
+
+        <!-- [新增] 设置菜单 -->
+        <div id="settingsMenu" class="hidden absolute top-14 right-4 z-40 bg-gray-800/90 backdrop-blur-md rounded-lg shadow-xl border border-gray-700 p-4 w-64 text-white">
+            <h3 class="text-lg font-semibold mb-3">全局设置</h3>
+            <div class="space-y-4">
+                <!-- 全球平均气温滑杆 -->
+                <div>
+                    <label for="globalTempSlider" class="block text-sm font-medium text-gray-300">
+                        全球平均气温: <span id="globalTempValue" class="font-bold text-cyan-400">289K</span>
+                    </label>
+                    <input type="range"
+                           id="globalTempSlider"
+                           name="GlobalTemp"
+                           min="273"
+                           max="305"
+                           value="289"
+                           step="1"
+                           class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer range-sm">
+                    <div class="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>273K</span>
+                        <span>305K</span>
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="globalShearSlider" class="block text-sm font-medium text-gray-300">
+                        全球平均风切: <span id="globalShearValue" class="font-bold text-cyan-400">100</span>
+                    </label>
+                    <input type="range"
+                           id="globalShearSlider"
+                           name="GlobalShear"
+                           min="0"
+                           max="200"
+                           value="100"
+                           step="1"
+                           class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer range-sm">
+                    <div class="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>0</span>
+                        <span>200</span>
+                    </div>
+                </div>
+                
+                <!-- [新增] 实测站点设置 -->
+                <div class="border-t border-gray-600 pt-4">
+                     <h4 class="text-md font-semibold mb-2 text-gray-200">标记位置</h4>
+                     <div class="space-y-2">
+                         <div>
+                             <label for="siteNameInput" class="block text-xs font-medium text-gray-400 mb-1">站点名称</label>
+                             <input type="text" id="siteNameInput" name="SiteName" placeholder="例如: 香港"
+                                    class="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500">
+                         </div>
+                         <div class="grid grid-cols-2 gap-2">
+                             <div>
+                                 <label for="siteLonInput" class="block text-xs font-medium text-gray-400 mb-1">经度 (°E)</label>
+                                 <input type="number" id="siteLonInput" name="SiteLon" placeholder="114.1" step="0.1"
+                                        class="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500">
+                             </div>
+                             <div>
+                                 <label for="siteLatInput" class="block text-xs font-medium text-gray-400 mb-1">纬度 (°N)</label>
+                                 <input type="number" id="siteLatInput" name="SiteLat" placeholder="22.3" step="0.1"
+                                        class="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500">
+                             </div>
+                         </div>
+                     </div>
+                </div>
+                <!-- 可以在这里添加更多设置项 -->
+
+            </div>
+        </div>
+
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md-text-4xl font-bold text-white tracking-tight">热带气旋模拟器 Made with coffee by @Enceladus</h1>
+            <p class="text-gray-400 mt-2">点击按钮，模拟一个热带气旋从生成到消散的完整生命周期。</p>
+        </header>
+
+        <!-- 控制区 -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+            <button id="generateButton" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-800">
+                生成一个新气旋
+            </button>
+            
+            <div class="w-full sm:w-auto">
+                <select id="basinSelector" class="w-full control-btn font-semibold py-3 px-6 rounded-lg text-lg appearance-none text-center">
+                    <option value="WPAC" selected>西北太平洋</option>
+                    <option value="EPAC">东北太平洋</option>
+                    <option value="NATL">北大西洋</option>
+                    <option value="NIO">北印度洋</option>
+                    <option value="SHEM">南太平洋</option>
+                    <option value="SIO">南印度洋</option>
+                    <option value="SATL">南大西洋</option>
+                </select>
+            </div>
+
+            <div class="w-full sm:w-auto">
+                <select id="monthSelector" class="w-full control-btn font-semibold py-3 px-6 rounded-lg text-lg appearance-none text-center">
+                    <option value="1">一月</option>
+                    <option value="2">二月</option>
+                    <option value="3">三月</option>
+                    <option value="4">四月</option>
+                    <option value="5">五月</option>
+                    <option value="6">六月</option>
+                    <option value="7" selected>七月</option>
+                    <option value="8">八月</option>
+                    <option value="9">九月</option>
+                    <option value="10">十月</option>
+                    <option value="11">十一月</option>
+                    <option value="12">十二月</option>
+                </select>
+            </div>
+             <button id="pauseButton" class="w-full sm:w-auto control-btn font-semibold py-3 px-6 rounded-lg text-lg" disabled>
+                暂停
+            </button>
+            <button id="toggleWindRadiiButton" class="w-full sm:w-auto control-btn font-semibold py-3 px-6 rounded-lg text-lg">
+                 显示风圈
+            </button>
+            <button id="togglePressureButton" class="w-full sm:w-auto control-btn font-semibold py-3 px-6 rounded-lg text-lg">
+                显示气压场
+            </button>
+            <button id="togglePathButton" class="w-full sm:w-auto control-btn font-semibold py-3 px-6 rounded-lg text-lg">
+                显示路径预测
+            </button>
+        </div>
+
+        <!-- 主内容区：图表和信息 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+            <!-- 气旋路径图 -->
+            <div class="lg:col-span-2 bg-gray-900/70 p-4 rounded-xl border border-gray-700">
+                <h2 class="text-xl font-semibold text-white mb-2 text-center">动态路径图</h2>
+                <div id="map-container" class="w-full h-96 md:h-[500px] bg-blue-900/30 rounded-lg overflow-hidden relative">
+                    <div id="map-info-box" class="absolute top-2 right-2 bg-gray-900/60 backdrop-blur-sm p-2 rounded-md text-white text-sm font-mono hidden shadow-lg">
+                        <p id="map-info-time" class="font-bold text-base"></p>
+                        <p id="map-info-intensity" class="text-yellow-300"></p>
+                        <p id="map-info-movement"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模拟信息 -->
+            <div id="info-panel" class="bg-gray-900/70 p-6 rounded-xl border border-gray-700 flex flex-col justify-between">
+                <div>
+                    <div id="initial-message" class="text-center text-gray-400">
+                        <p class="text-lg">风暴正在酝酿...</p>
+                        <p class="mt-4">点击上方按钮，见证一个热带气旋的诞生！</p>
+                    </div>
+                    <div id="simulation-output" class="hidden">
+                        <h2 class="text-2xl font-bold text-cyan-400 mb-1" id="status"></h2>
+                        <p class="text-gray-300 text-sm mb-4" id="simulationTime"></p>
+                        <div class="space-y-3 text-lg">
+                            <div class="flex justify-between items-center border-b border-gray-700 pb-2 mb-2">
+                                <span class="font-semibold text-gray-400">当前位置:</span>
+                                <div>
+                                    <span id="latitude" class="font-mono text-white font-bold"></span>
+                                    <span id="longitude" class="font-mono text-white font-bold"></span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center border-b border-gray-700 pb-2 mb-2">
+                                <span class="font-semibold text-gray-400">最大风速:</span> <span id="intensity" class="font-mono text-white font-bold"></span>
+                            </div>
+                            <div class="flex justify-between items-center border-b border-gray-700 pb-2 mb-2">
+                                <span class="font-semibold text-gray-400">最低气压:</span> <span id="pressure" class="font-mono text-white font-bold"></span>
+                            </div>
+                            <div class="flex justify-between items-center pb-2 mb-2 border-b border-gray-700">
+                                <span class="font-semibold text-gray-400">等级:</span> <span id="category" class="font-mono text-white font-bold"></span>
+                            </div>
+                            <div class="flex justify-between items-center pb-2 mb-2 border-b border-gray-700">
+                                <span class="font-semibold text-gray-400">气旋能量指数:</span> <span id="ace" class="font-mono text-white font-bold"></span>
+                            </div>
+                             <div class="flex justify-between items-center">
+                                <span class="font-semibold text-gray-400">移动方向:</span> <span id="direction" class="font-mono text-white"></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold text-gray-400">移动速度:</span> <span id="speed" class="font-mono text-white"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                 <!-- 新增：Best Track 记录区 -->
+                <div id="best-track-container" class="hidden mt-6">
+                    <h3 class="text-lg font-semibold text-white mb-2">Best Track 数据</h3>
+                    <textarea id="best-track-data" readonly class="w-full h-24 p-2 bg-gray-800 text-gray-300 font-mono text-xs rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    <button id="copy-track-button" class="mt-2 w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition">
+                        复制数据
+                    </button>
+                    <button id="download-track-button" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition">
+                        下载ATCF
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- [修改] 强度图表容器 -->
+        <div id="intensity-chart-section" class="hidden mt-6 md:mt-8 bg-gray-900/70 p-4 rounded-xl border border-gray-700">
+            <h3 id="intensity-chart-title" class="text-lg font-semibold text-white mb-2 text-center">历史强度回顾</h3>
+            <div id="intensity-chart-container" class="w-full h-64 rounded-lg"></div>
+        </div>
+
+    </div>
+
+    <!-- 加载主JavaScript文件，注意 type="module" 是必需的 -->
+    <script type="module" src="js/main.js"></script>
+    <script src="nav.js" defer></script>
+</body>
+</html>
